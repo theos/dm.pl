@@ -3,18 +3,40 @@ use strict;
 use warnings;
 use File::Find;
 use File::Spec;
-use FileHandle;
-use IPC::Open2;
 use Cwd;
 use Getopt::Long;
 use Pod::Usage;
-our $VERSION = '1.0';
+use Archive::Tar;
+use IO::Compress::Gzip;
+use IO::Compress::Bzip2;
+
+package NIC::Archive::Tar::File;
+use parent "Archive::Tar::File";
+sub new {
+	my $class = shift;
+	my $self = Archive::Tar::File->new(@_);
+	bless($self, $class);
+	return $self;
+}
+
+sub full_path {
+	my $self = shift;
+	my $full_path = $self->SUPER::full_path(); $full_path = '' unless defined $full_path;
+	$full_path =~ s#^#./# if $full_path ne "" && $full_path ne "." && $full_path !~ m#^\./#;
+	return $full_path;
+}
+1;
+package main;
+
+our $VERSION = '2.0';
 
 our $_PROGNAME = "dm.pl";
 
 my $ADMINARCHIVENAME = "control.tar.gz";
 my $DATAARCHIVENAME = "data.tar";
 my $ARCHIVEVERSION = "2.0";
+
+$Archive::Tar::DO_NOT_USE_PREFIX = 1; # use GNU extensions (not POSIX prefix)
 
 our $compression = "gzip";
 Getopt::Long::Configure("bundling", "auto_version");
@@ -29,8 +51,6 @@ pod2usage(1) if(@ARGV < 2);
 my $pwd = Cwd::cwd();
 my $indir = File::Spec->rel2abs($ARGV[0]);
 my $outfile = $ARGV[1];
-
-my $tar = get_tar_version(); # aref: [name, ver]
 
 die "ERROR: '$indir' is not a directory or does not exist.\n" unless -d $indir;
 
@@ -55,46 +75,33 @@ foreach my $m ("preinst", "postinst", "prerm", "postrm", "extrainst_") {
 	die sprintf("ERROR: maintainer script '$m' has bad permissions %03lo (must be >=0555 and <=0775)\n", $mode & 07777) if(($mode & 07557) != 0555)
 }
 
-open(my $ar, '>', $outfile) or die $!;
-
-my ($tarin, $tarout);
-
-chdir $controldir or die $!;
-my ($controldata, $controlsize);
-open($tarout, '-|', $tar->[0]." -c -f - . | gzip -c -9") or die "ERROR: failed to use tar properly (administrative archive): $!\n"; {
-	my $o = 0;
-	while(!eof $tarout) {
-		$o += read $tarout, $controldata, 1024, $o;
-	}
-	$controlsize = $o;
-} close $tarout;
-
 print "$_PROGNAME: building package `".$control_data{"package"}.":".$control_data{"architecture"}."' in `$outfile'\n";
+
+open(my $ar, '>', $outfile) or die $!;
 
 print $ar "!<arch>\n";
 print_ar_record($ar, "debian-binary", time, 0, 0, 0100644, 4);
 print_ar_file($ar, "$ARCHIVEVERSION\n", 4);
-print_ar_record($ar, $ADMINARCHIVENAME, time, 0, 0, 0100644, $controlsize);
-print_ar_file($ar, $controldata, $controlsize);
 
-chdir $indir;
-my @files = tar_filelist();
-
-open2($tarout, $tarin, $tar->[0]." -c -f - --null -T - ".($tar->[1] eq "bsd" ? "-n" : "--no-recursion").compression_pipe()) or die "ERROR: failed to use tar properly (data archive): $!\n";
-foreach(@files) {
-	print $tarin $_,chr(0);
-	$tarin->flush();
-} close $tarin;
-my ($archivedata, $archivesize); {
-	my $o = 0;
-	while(!eof $tarout) {
-		$o += read $tarout, $archivedata, 1024, $o;
-	}
-	$archivesize = $o;
-} close $tarout;
-
-print_ar_record($ar, compressed_filename($DATAARCHIVENAME), time, 0, 0, 0100644, $archivesize);
-print_ar_file($ar, $archivedata, $archivesize);
+{
+	my $tar = Archive::Tar->new();
+	$tar->add_files(tar_filelist($controldir));
+	my $comp;
+	my $zFd = IO::Compress::Gzip->new(\$comp, -Level => 9);
+	$tar->write($zFd);
+	$zFd->close();
+	print_ar_record($ar, $ADMINARCHIVENAME, time, 0, 0, 0100644, length($comp));
+	print_ar_file($ar, $comp, length($comp));
+} {
+	my $tar = Archive::Tar->new();
+	$tar->add_files(tar_filelist($indir));
+	my $comp;
+	my $zFd = compressed_fd(\$comp);
+	$tar->write($zFd);
+	$zFd->close();
+	print_ar_record($ar, compressed_filename($DATAARCHIVENAME), time, 0, 0, 0100644, length($comp));
+	print_ar_file($ar, $comp, length($comp));
+}
 
 close $ar;
 
@@ -112,16 +119,16 @@ sub print_ar_file {
 }
 
 sub tar_filelist {
-	our @filelist;
-	our @symlinks;
+	chdir(shift);
+	my @filelist;
+	my @symlinks;
 
-	find({wanted => \&wanted, no_chdir => 1}, ".");
-
-	sub wanted {
+	find({wanted => sub {
 		return if m#^./DEBIAN#;
-		push @symlinks, $_ if -l;
-		push @filelist, $_ if ! -l;
-	}
+		my $tf = NIC::Archive::Tar::File->new(file=>$_);
+		push @symlinks, $tf if -l;
+		push @filelist, $tf if ! -l;
+	}, no_chdir => 1}, ".");
 	return (@filelist, @symlinks);
 }
 
@@ -138,26 +145,12 @@ sub read_control_file {
 	return %data;
 }
 
-sub _tar_version {
-	my $tar = shift;
-	my $v;
-	open(my $tarversionfh, '-|', "$tar --version") or return undef;
-	$_ = <$tarversionfh>;
-	$v = "bsd" if m/bsdtar/;
-	$v = "gnu" if m/GNU/;
-	close $tarversionfh;
-	return [$tar, $v];
-}
-
-sub get_tar_version {
-	return _tar_version('gnutar') // _tar_version('tar') // _tar_version('bsdtar')
-}
-
-sub compression_pipe {
-	return "|gzip -9c" if $::compression eq "gzip";
-	return "|bzip2 -9c" if $::compression eq "bzip2";
-	return "|lzma -9c" if $::compression eq "lzma";
-	return "";
+sub compressed_fd {
+	my $sref = shift;
+	return IO::Compress::Gzip->new($sref, -Level => 9) if $::compression eq "gzip";
+	return IO::Compress::Bzip2->new($sref) if $::compression eq "bzip2";
+	open my $fh, ">", $sref;
+	return $fh;
 }
 
 sub compressed_filename {
@@ -165,7 +158,6 @@ sub compressed_filename {
 	my $suffix = "";
 	$suffix = ".gz" if $::compression eq "gzip";
 	$suffix = ".bz2" if $::compression eq "bzip2";
-	$suffix = ".lzma" if $::compression eq "lzma";
 	return $fn.$suffix;
 }
 
@@ -189,7 +181,7 @@ This option exists solely for compatibility with dpkg-deb.
 
 =item B<-ZE<lt>compressionE<gt>>
 
-Specify the package compression type. Valid values are gzip (default), bzip2, lzma and cat (no compression.)
+Specify the package compression type. Valid values are gzip (default), bzip2 and cat (no compression.)
 
 =item B<--help>, B<-?>
 
