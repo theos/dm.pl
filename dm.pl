@@ -60,7 +60,7 @@ die "ERROR: control directory '$controldir' is not a directory or does not exist
 my $mode = (lstat($controldir))[2];
 die sprintf("ERROR: control directory has bad permissions %03lo (must be >=0755 and <=0775)\n", $mode & 07777) if(($mode & 07757) != 0755);
 
-my $controlfile = File::Spec->catfile("", $controldir, "control");
+my $controlfile = File::Spec->catfile($controldir, "control");
 die "ERROR: control file '$controlfile' is not a plain file\n" unless -f $controlfile;
 my %control_data = read_control_file($controlfile);
 
@@ -68,7 +68,7 @@ die "ERROR: package name has characters that aren't lowercase alphanums or '-+.'
 die "ERROR: package version ".$control_data{"version"}." doesn't contain any digits.\n" if($control_data{"version"} !~ m/[0-9]/);
 
 foreach my $m ("preinst", "postinst", "prerm", "postrm", "extrainst_") {
-	$_ = File::Spec->catfile("", $controldir, $m);
+	$_ = File::Spec->catfile($controldir, $m);
 	next unless -e $_;
 	die "ERROR: maintainer script '$m' is not a plain file or symlink\n" unless(-f $_ || -l $_);
 	$mode = (lstat)[2];
