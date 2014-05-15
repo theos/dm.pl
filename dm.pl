@@ -126,6 +126,8 @@ sub tar_filelist {
 	find({wanted => sub {
 		return if m#^./DEBIAN#;
 		my $tf = NIC::Archive::Tar::File->new(file=>$_);
+		my $mode = (stat($_))[2] & 07777;
+		$tf->mode($mode);
 		push @symlinks, $tf if -l;
 		push @filelist, $tf if ! -l;
 	}, no_chdir => 1}, ".");
