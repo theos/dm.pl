@@ -9,6 +9,8 @@ use Pod::Usage;
 use Archive::Tar;
 use IO::Compress::Gzip;
 use IO::Compress::Bzip2;
+use IO::Compress::Lzma;
+use IO::Compress::Xz;
 
 package NIC::Archive::Tar::File;
 use parent "Archive::Tar::File";
@@ -151,6 +153,8 @@ sub compressed_fd {
 	my $sref = shift;
 	return IO::Compress::Gzip->new($sref, -Level => 9) if $::compression eq "gzip";
 	return IO::Compress::Bzip2->new($sref) if $::compression eq "bzip2";
+	return IO::Compress::Lzma->new($sref) if $::compression eq "lzma";
+	return IO::Compress::Xz->new($sref) if $::compression eq "xz";
 	open my $fh, ">", $sref;
 	return $fh;
 }
@@ -160,6 +164,8 @@ sub compressed_filename {
 	my $suffix = "";
 	$suffix = ".gz" if $::compression eq "gzip";
 	$suffix = ".bz2" if $::compression eq "bzip2";
+	$suffix = ".lzma" if $::compression eq "lzma";
+	$suffix = ".xz" if $::compression eq "xz";
 	return $fn.$suffix;
 }
 
@@ -183,7 +189,7 @@ This option exists solely for compatibility with dpkg-deb.
 
 =item B<-ZE<lt>compressionE<gt>>
 
-Specify the package compression type. Valid values are gzip (default), bzip2 and cat (no compression.)
+Specify the package compression type. Valid values are gzip (default), bzip2, lzma, xz and cat (no compression.)
 
 =item B<--help>, B<-?>
 
