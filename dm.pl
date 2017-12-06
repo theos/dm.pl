@@ -77,6 +77,10 @@ my $controlfile = File::Spec->catfile($controldir, "control");
 die "ERROR: control file '$controlfile' is not a plain file\n" unless -f $controlfile;
 my %control_data = read_control_file($controlfile);
 
+die "ERROR: control file '$controlfile' is missing a Package field" unless defined $control_data{"package"};
+die "ERROR: control file '$controlfile' is missing a Version field" unless defined $control_data{"version"};
+die "ERROR: control file '$controlfile' is missing an Architecture field" unless defined $control_data{"architecture"};
+
 die "ERROR: package name has characters that aren't lowercase alphanums or '-+.'.\n" if($control_data{"package"} =~ m/[^a-z0-9+-.]/);
 die "ERROR: package version ".$control_data{"version"}." doesn't contain any digits.\n" if($control_data{"version"} !~ m/[0-9]/);
 
@@ -166,6 +170,9 @@ sub compressed_fd {
 	return IO::Compress::Bzip2->new($sref, -BlockSize100K => $compresslevel) if $::compression eq "bzip2";
 	return IO::Compress::Lzma->new($sref) if $::compression eq "lzma";
 	return IO::Compress::Xz->new($sref) if $::compression eq "xz";
+	if($::compression ne "cat") {
+		print "WARNING: compressor '$::compression' is unknown, falling back to cat.\n";
+	}
 	open my $fh, ">", $sref;
 	return $fh;
 }
