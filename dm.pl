@@ -41,14 +41,25 @@ my $ARCHIVEVERSION = "2.0";
 $Archive::Tar::DO_NOT_USE_PREFIX = 1; # use GNU extensions (not POSIX prefix)
 
 our $compression = "gzip";
+our $compresslevel = -1;
 Getopt::Long::Configure("bundling", "auto_version");
 GetOptions('compression|Z=s' => \$compression,
+	'compress-level|z=i' => \$compresslevel,
 	'build|b' => sub { },
 	'help|?' => sub { pod2usage(1); },
 	'man' => sub { pod2usage(-exitstatus => 0, -verbose => 2); })
 	or pod2usage(2);
 
 pod2usage(1) if(@ARGV < 2);
+
+if($compresslevel < 0 || $compresslevel > 9) {
+	$compresslevel = 6;
+	$compresslevel = 9 if $compression eq "bzip2";
+}
+
+if($compression eq "bzip2" && $compresslevel eq 0) {
+	$compresslevel = 1;
+}
 
 my $pwd = Cwd::cwd();
 my $indir = File::Spec->rel2abs($ARGV[0]);
@@ -151,8 +162,8 @@ sub read_control_file {
 
 sub compressed_fd {
 	my $sref = shift;
-	return IO::Compress::Gzip->new($sref, -Level => 9) if $::compression eq "gzip";
-	return IO::Compress::Bzip2->new($sref) if $::compression eq "bzip2";
+	return IO::Compress::Gzip->new($sref, -Level => $compresslevel) if $::compression eq "gzip";
+	return IO::Compress::Bzip2->new($sref, -BlockSize100K => $compresslevel) if $::compression eq "bzip2";
 	return IO::Compress::Lzma->new($sref) if $::compression eq "lzma";
 	return IO::Compress::Xz->new($sref) if $::compression eq "xz";
 	open my $fh, ">", $sref;
@@ -190,6 +201,10 @@ This option exists solely for compatibility with dpkg-deb.
 =item B<-ZE<lt>compressionE<gt>>
 
 Specify the package compression type. Valid values are gzip (default), bzip2, lzma, xz and cat (no compression.)
+
+=item B<-zE<lt>compress-levelE<gt>>
+
+Specify the package compression level. Valid values are between 0 and 9. Default is 9 for bzip2, 6 for others. 0 is identical to 1 when using bzip2. Refer to B<gzip(1)>, B<bzip2(1)>, B<xz(1)> for explanations of what effect each compression level has.
 
 =item B<--help>, B<-?>
 
