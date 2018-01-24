@@ -3,14 +3,12 @@ use strict;
 use warnings;
 use File::Find;
 use File::Spec;
+use File::Slurp;
 use Cwd;
 use Getopt::Long;
 use Pod::Usage;
 use Archive::Tar;
-use IO::Compress::Gzip;
-use IO::Compress::Bzip2;
-use IO::Compress::Lzma;
-use IO::Compress::Xz;
+use IPC::Open2;
 
 package NIC::Archive::Tar::File;
 use parent "Archive::Tar::File";
@@ -112,12 +110,16 @@ print_ar_file($ar, "$ARCHIVEVERSION\n", 4);
 } {
 	my $tar = Archive::Tar->new();
 	$tar->add_files(tar_filelist($indir));
-	my $comp;
-	my $zFd = compressed_fd(\$comp);
-	$tar->write($zFd);
-	$zFd->close();
-	print_ar_record($ar, compressed_filename($DATAARCHIVENAME), time, 0, 0, 0100644, length($comp));
-	print_ar_file($ar, $comp, length($comp));
+	my ($fh_out, $fh_in);
+	my $pid = open2($fh_out, $fh_in, compression_cmd()) or die "ERROR: open2 failed to create pipes for '$::compression'\n";
+	$tar->write($fh_in);
+	$fh_in->close();
+	waitpid($pid, 0);
+	my $archivedata = read_file($fh_out);
+	my $archivesize = length($archivedata);
+	$fh_out->close();
+	print_ar_record($ar, compressed_filename($DATAARCHIVENAME), time, 0, 0, 0100644, $archivesize);
+	print_ar_file($ar, $archivedata, $archivesize);
 }
 
 close $ar;
@@ -136,6 +138,7 @@ sub print_ar_file {
 }
 
 sub tar_filelist {
+	my $dir = getcwd;
 	chdir(shift);
 	my @filelist;
 	my @symlinks;
@@ -149,6 +152,7 @@ sub tar_filelist {
 		push @symlinks, $tf if -l;
 		push @filelist, $tf if ! -l;
 	}, no_chdir => 1}, ".");
+	chdir($dir);
 	return (@filelist, @symlinks);
 }
 
@@ -165,17 +169,15 @@ sub read_control_file {
 	return %data;
 }
 
-sub compressed_fd {
-	my $sref = shift;
-	return IO::Compress::Gzip->new($sref, -Level => $compresslevel) if $::compression eq "gzip";
-	return IO::Compress::Bzip2->new($sref, -BlockSize100K => $compresslevel) if $::compression eq "bzip2";
-	return IO::Compress::Lzma->new($sref) if $::compression eq "lzma";
-	return IO::Compress::Xz->new($sref) if $::compression eq "xz";
+sub compression_cmd {
+	return "gzip -9c" if $::compression eq "gzip";
+	return "bzip2 -9c" if $::compression eq "bzip2";
+	return "lzma -9c" if $::compression eq "lzma";
+	return "xz -9c" if $::compression eq "xz";
 	if($::compression ne "cat") {
 		print "WARNING: compressor '$::compression' is unknown, falling back to cat.\n";
 	}
-	open my $fh, ">", $sref;
-	return $fh;
+	return "cat";
 }
 
 sub compressed_filename {
