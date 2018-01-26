@@ -146,7 +146,7 @@ sub tar_filelist {
 	find({wanted => sub {
 		return if m#^./DEBIAN#;
 		my $tf = NIC::Archive::Tar::File->new(file=>$_);
-		my $mode = (stat($_))[2] & 07777;
+		my $mode = (lstat($_))[2] & 07777;
 		$tf->mode($mode);
 		$tf->chown("root", "wheel");
 		push @symlinks, $tf if -l;
