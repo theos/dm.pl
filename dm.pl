@@ -170,10 +170,10 @@ sub read_control_file {
 }
 
 sub compression_cmd {
-	return "gzip -9c" if $::compression eq "gzip";
-	return "bzip2 -9c" if $::compression eq "bzip2";
-	return "lzma -9c" if $::compression eq "lzma";
-	return "xz -9c" if $::compression eq "xz";
+	return "gzip -c".$compresslevel if $::compression eq "gzip";
+	return "bzip2 -c".$compresslevel if $::compression eq "bzip2";
+	return "lzma -c".$compresslevel if $::compression eq "lzma";
+	return "xz -c".$compresslevel if $::compression eq "xz";
 	if($::compression ne "cat") {
 		print "WARNING: compressor '$::compression' is unknown, falling back to cat.\n";
 	}
