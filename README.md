@@ -4,7 +4,13 @@ A basic Perl program that makes Debian software packages (.deb files) without ne
 ## Installation
 dm.pl is included with and used by Theos, so if you’re wanting to use this with Theos, you’re likely already using it. (If not, [update](https://github.com/theos/theos/wiki/Installation#updating)!)
 
-Otherwise, you can clone a copy of this repo:
+Otherwise, you can either install with npm:
+
+```bash
+npm install -g @theos/dm.pl
+```
+
+…or clone a copy of this repo:
 
 ```bash
 git clone https://github.com/theos/dm.pl.git
@@ -12,7 +18,7 @@ git clone https://github.com/theos/dm.pl.git
 
 …and immediately start using it.
 
-This will work on any system with Perl installed. If not already installed, *xz-utils* is also recommended to add support for xz and lzma compression.
+This will work on any system with Perl and xz-utils installed. (If you’re not sure, they almost certainly are already installed by your OS.)
 
 ## Synopsis
 ```

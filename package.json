@@ -1,0 +1,25 @@
+{
+  "name": "@theos/dm.pl",
+  "version": "1.1.0",
+  "description": "A basic Perl program that makes Debian .deb packages without needing dpkg installed.",
+  "author": "Theos",
+  "license": "MIT",
+  "homepage": "https://theos.github.io/",
+  "bugs": "https://github.com/theos/dm.pl/issues",
+
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theos/dm.pl.git"
+  },
+
+  "keywords": [
+    "deb",
+    "dpkg",
+    "debian"
+  ],
+
+  "bin": {
+    "dm.pl": "dm.pl",
+    "dm": "dm.pl"
+  }
+}
