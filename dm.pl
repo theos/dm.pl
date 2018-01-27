@@ -1,6 +1,8 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
+use FindBin;
+use lib "$FindBin::RealBin/lib";
 use File::Find;
 use File::Spec;
 use File::Slurp;
