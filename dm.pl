@@ -11,6 +11,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Archive::Tar;
 use IPC::Open2;
+use POSIX;
 
 package NIC::Archive::Tar::File;
 use parent "Archive::Tar::File";
@@ -114,42 +115,30 @@ print_ar_file($ar, "$ARCHIVEVERSION\n", 4);
 	$tar->add_files(tar_filelist($indir));
 	my ($fh_out, $fh_in);
 	my $pid = open2($fh_out, $fh_in, compression_cmd()) or die "ERROR: open2 failed to create pipes for '$::compression'\n";
-	# Make temporary file to buffer the tar archive
-	open(my $tmp, "+>", undef) or die "died of anon file";
-	$tar->write($tmp);
-	seek($tmp, 0, 0);
-	my $tmp_data = read_file($tmp);
+	fcntl($fh_out, F_SETFL, O_NONBLOCK);
+	my $tmp_data = $tar->write();
+	my $tmp_size = length($tmp_data);
 
-	my $counter = 0;
 	my ($off_in, $off_out) = (0, 0);
 	my ($archivedata, $archivesize);
-	while($off_in < length($tmp_data)) {
-		# Write 1024 blocks of data
-		$off_in += syswrite $fh_in, $tmp_data, 1024, $off_in;
-		$counter += 1;
-		# Read out 50KB worth of compressed data out of the pipe
-		if ($counter == 50) {
-			$counter = 0;
-			while (1) {
-				my $o = 0;
-				# Timeout sysread
-				eval {
-				    local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
-				    alarm 1;
-					# Read out compressed data
-				    my $oo = sysread $fh_out, $archivedata, 1024, $off_out;
-				    alarm 0;
-					$o = $oo; # Otherwise Perl complains that, two lines after, $o is uninitialized
-				};
-				last if ($o == 0);
-				$off_out += $o;
-			}
+	while($off_in < $tmp_size) {
+		# Write 8KB of data
+		$off_in += syswrite $fh_in, $tmp_data, 8192, $off_in;
+		# Get the compressed result if possible
+	    my $o = sysread $fh_out, $archivedata, 8192, $off_out;
+		if (defined($o)) {
+			$off_out += $o;
 		}
 	}
 	$fh_in->close();
-	# Read remaining data
-	while(!eof $fh_out) {
-		$off_out += read $fh_out, $archivedata, 1024, $off_out;
+
+	while (1) {
+		# Get the remaining data
+		my $o = sysread $fh_out, $archivedata, 8192, $off_out;
+		if (defined($o)) {
+			$off_out += $o;
+			last;
+		}
 	}
 	$archivesize = $off_out;
 	$fh_out->close();
