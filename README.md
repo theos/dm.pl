@@ -7,7 +7,7 @@ dm.pl is included with and used by Theos, so if you’re wanting to use this wit
 Otherwise, you can either install with npm:
 
 ```bash
-npm install -g @theos/dm.pl
+npm install -g @theosdev/dm.pl
 ```
 
 …or clone a copy of this repo:
