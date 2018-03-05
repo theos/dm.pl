@@ -1,5 +1,5 @@
 {
-  "name": "@theos/dm.pl",
+  "name": "@theosdev/dm.pl",
   "version": "1.1.0",
   "description": "A basic Perl program that makes Debian .deb packages without needing dpkg installed.",
   "author": "Theos",
