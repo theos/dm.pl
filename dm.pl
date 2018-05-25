@@ -135,8 +135,9 @@ print_ar_file($ar, "$ARCHIVEVERSION\n", 4);
 	while (1) {
 		# Get the remaining data
 		my $o = sysread $fh_out, $archivedata, 8192, $off_out;
-		if (defined($o)) {
+		if (defined($o) && $o > 0) {
 			$off_out += $o;
+		} elsif ($! != EAGAIN) {
 			last;
 		}
 	}
