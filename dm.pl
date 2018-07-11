@@ -77,7 +77,8 @@ die "ERROR: control file '$controlfile' is missing a Package field" unless defin
 die "ERROR: control file '$controlfile' is missing a Version field" unless defined $control_data{"version"};
 die "ERROR: control file '$controlfile' is missing an Architecture field" unless defined $control_data{"architecture"};
 
-die "ERROR: package name has characters that aren't lowercase alphanums or '-+.'.\n" if($control_data{"package"} =~ m/[^a-z0-9+-.]/);
+die "ERROR: package name has characters that aren't alphanums or '-+.'.\n" if($control_data{"package"} =~ m/[^a-zA-Z0-9+-.]/);
+print "WARNING: package name has capital letters - lowercase is recommended\n" if($control_data{"package"} =~ m/[A-Z]/);
 die "ERROR: package version ".$control_data{"version"}." doesn't contain any digits.\n" if($control_data{"version"} !~ m/[0-9]/);
 
 foreach my $m ("preinst", "postinst", "prerm", "postrm", "extrainst_") {
