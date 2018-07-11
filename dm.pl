@@ -36,8 +36,6 @@ my $ADMINARCHIVENAME = "control.tar.gz";
 my $DATAARCHIVENAME = "data.tar";
 my $ARCHIVEVERSION = "2.0";
 
-$Archive::Tar::DO_NOT_USE_PREFIX = 1; # use GNU extensions (not POSIX prefix)
-
 our $compression = "gzip";
 our $compresslevel = -1;
 Getopt::Long::Configure("bundling", "auto_version");
