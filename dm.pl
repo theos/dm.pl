@@ -183,6 +183,7 @@ sub read_control_file {
 	open(my $fh, '<', $filename) or die "ERROR: can't open control file '$filename'\n";
 	my %data;
 	while(<$fh>) {
+		die "ERROR: control file contains Windows/Macintosh line endings - please use a text editor or dos2unix to change to Unix line endings\n" if(m/\r/);
 		if(m/^(.*?): (.*)/) {
 			$data{lc($1)} = $2;
 		}
