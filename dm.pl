@@ -89,6 +89,10 @@ foreach my $m ("preinst", "postinst", "prerm", "postrm", "extrainst_") {
 	die sprintf("ERROR: maintainer script '$m' has bad permissions %03lo (must be >=0555 and <=0775)\n", $mode & 07777) if(($mode & 07557) != 0555)
 }
 
+if (-d "$outfile") {
+	$outfile = sprintf('%s/%s_%s_%s.deb', $outfile, $control_data{"package"}, $control_data{"version"}, $control_data{"architecture"});
+}
+
 print "$_PROGNAME: building package `".$control_data{"package"}.":".$control_data{"architecture"}."' in `$outfile'\n";
 
 open(my $ar, '>', $outfile) or die $!;
