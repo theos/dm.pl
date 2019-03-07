@@ -53,7 +53,7 @@ if($compresslevel < 0 || $compresslevel > 9) {
 	$compresslevel = 9 if $compression eq "bzip2";
 }
 
-if(($compression eq "bzip2" || $compression eq "gzip") && $compresslevel eq 0) {
+if($compresslevel eq 0) {
 	$compresslevel = 1;
 }
 
