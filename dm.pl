@@ -171,9 +171,15 @@ sub tar_filelist {
 	find({wanted => sub {
 		return if m#^./DEBIAN#;
 		my $tf = NIC::Archive::Tar::File->new(file=>$_);
-		my $mode = (lstat($_))[2] & 07777;
+		my @stat = lstat($_);
+		my $mode = $stat[2] & 07777;
 		$tf->mode($mode);
-		$tf->chown("root", "wheel");
+		if ($< == 0) {
+			# Runing under fake or real root
+			$tf->chown($stat[4], $stat[5]);
+		} else {
+			$tf->chown("root", "wheel");
+		}
 		push @symlinks, $tf if -l;
 		push @filelist, $tf if ! -l;
 	}, no_chdir => 1}, ".");
