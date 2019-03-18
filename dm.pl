@@ -115,18 +115,28 @@ print_ar_file($ar, "$ARCHIVEVERSION\n", 4);
 	my ($fh_out, $fh_in);
 	my $pid = open2($fh_out, $fh_in, compression_cmd()) or die "ERROR: open2 failed to create pipes for '$::compression'\n";
 	fcntl($fh_out, F_SETFL, O_NONBLOCK);
+	fcntl($fh_in, F_SETFL, O_NONBLOCK);
 	my $tmp_data = $tar->write();
 	my $tmp_size = length($tmp_data);
 
 	my ($off_in, $off_out) = (0, 0);
 	my ($archivedata, $archivesize);
 	while($off_in < $tmp_size) {
-		# Write 8KB of data
-		$off_in += syswrite $fh_in, $tmp_data, 8192, $off_in;
-		# Get the compressed result if possible
-	    my $o = sysread $fh_out, $archivedata, 8192, $off_out;
-		if (defined($o)) {
-			$off_out += $o;
+		my ($rin, $win) = ('', '');
+		my ($rout, $wout);
+		vec($win, fileno($fh_in), 1) = 1;
+		vec($rin, fileno($fh_out), 1) = 1;
+		# Wait for space to be available to write or data to be available to read
+		select($rout=$rin, $wout=$win, undef, undef);
+		if (vec($wout, fileno($fh_in), 1)) {
+			# Write 8KB of data
+			my $wrote = syswrite $fh_in, $tmp_data, 8192, $off_in;
+			$off_in += $wrote if (defined $wrote);
+		}
+		if (vec($rin, fileno($fh_out), 1)) {
+			# Get the compressed result if possible
+			my $o = sysread $fh_out, $archivedata, 8192, $off_out;
+			$off_out += $o if (defined($o));
 		}
 	}
 	$fh_in->close();
