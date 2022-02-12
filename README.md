@@ -2,7 +2,7 @@
 A basic Perl program that makes Debian software packages (.deb files) without needing dpkg installed. It works as a drop-in replacement for `dpkg-deb -b`, with compatible flags.
 
 ## Installation
-dm.pl is included with and used by Theos, so if you’re wanting to use this with Theos, you’re likely already using it. (If not, [update](https://github.com/theos/theos/wiki/Installation#updating)!)
+dm.pl is included with and used by Theos, so if you’re using an up-to-date version of Theos you already have access to it! If you believe that you're using a legacy version of Theos, see [here](https://theos.dev/docs/upgrading-from-legacy-theos) for how to update.
 
 Otherwise, you can either install with npm:
 
