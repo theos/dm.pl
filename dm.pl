@@ -177,7 +177,6 @@ sub tar_filelist {
 	my $dir = getcwd;
 	chdir(shift);
 	my @filelist;
-	my @symlinks;
 
 	find({wanted => sub {
 		return if m#^./DEBIAN#;
@@ -191,11 +190,10 @@ sub tar_filelist {
 		} else {
 			$tf->chown("root", "wheel");
 		}
-		push @symlinks, $tf if -l;
-		push @filelist, $tf if ! -l;
+		push @filelist, $tf;
 	}, no_chdir => 1}, ".");
 	chdir($dir);
-	return (@filelist, @symlinks);
+	return sort { $a->full_path cmp $b->full_path } @filelist;
 }
 
 sub read_control_file {
