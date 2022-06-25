@@ -204,7 +204,7 @@ sub read_control_file {
 		die "ERROR: control file contains Windows/Macintosh line endings - please use a text editor or dos2unix to change to Unix line endings\n" if (m/\r/);
 		if (m/^(.*?): (.*)/) {
 			$data{lc($1)} = $2;
-			die "ERROR: control file contains an unclosed parentheses\n" if ($_ =~ /\(/ && $_ !~ /\)/);
+			die "ERROR: control file contains an unclosed parentheses\n" if (($_ =~ /\(/ && $_ !~ /\)/) || ($_ !~ /\(/ && $_ =~ /\)/));
 		}
 		if (eof) {
 			die "ERROR: control file is missing a final newline (\\n)\n" if (substr($_, -1) ne "\n");
