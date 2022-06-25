@@ -62,11 +62,11 @@ my $pwd = Cwd::cwd();
 my $indir = File::Spec->rel2abs($ARGV[0]);
 my $outfile = $ARGV[1];
 
-die "ERROR: '$indir' is not a directory or does not exist.\n" unless -d $indir;
+die "ERROR: '$indir' is not a directory or does not exist\n" unless -d $indir;
 
 my $controldir = File::Spec->catpath("", $indir, "DEBIAN");
 
-die "ERROR: control directory '$controldir' is not a directory or does not exist.\n" unless -d $controldir;
+die "ERROR: control directory '$controldir' is not a directory or does not exist\n" unless -d $controldir;
 my $mode = (lstat($controldir))[2];
 die sprintf("ERROR: control directory has bad permissions %03lo (must be >=0755 and <=0775)\n", $mode & 07777) if (($mode & 07757) != 0755);
 
@@ -78,8 +78,8 @@ die "ERROR: control file '$controlfile' is missing a Package field" unless defin
 die "ERROR: control file '$controlfile' is missing a Version field" unless defined $control_data{"version"};
 die "ERROR: control file '$controlfile' is missing an Architecture field" unless defined $control_data{"architecture"};
 
-die "ERROR: package name has characters that aren't lowercase alphanums or '-+.'.\n" if ($control_data{"package"} =~ m/[^a-z0-9+-.]/);
-die "ERROR: package version ".$control_data{"version"}." doesn't contain any digits.\n" if ($control_data{"version"} !~ m/[0-9]/);
+die "ERROR: package name has characters that aren't lowercase alphanums or '-+.'\n" if ($control_data{"package"} =~ m/[^a-z0-9+-.]/);
+die "ERROR: package version ".$control_data{"version"}." doesn't contain any digits\n" if ($control_data{"version"} !~ m/[0-9]/);
 
 foreach my $m ("preinst", "postinst", "prerm", "postrm", "extrainst_") {
 	$_ = File::Spec->catfile($controldir, $m);
