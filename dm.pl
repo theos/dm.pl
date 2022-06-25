@@ -23,7 +23,7 @@ sub new {
 sub full_path {
 	my $self = shift;
 	my $full_path = $self->SUPER::full_path(); $full_path = '' unless defined $full_path;
-	$full_path =~ s#^#./# if $full_path ne "" && $full_path ne "." && $full_path !~ m#^\./#;
+	$full_path =~ s#^#./# if ($full_path ne "" && $full_path ne "." && $full_path !~ m#^\./#);
 	return $full_path;
 }
 1;
@@ -47,14 +47,14 @@ GetOptions('compression|Z=s' => \$compression,
 	'man' => sub { pod2usage(-exitstatus => 0, -verbose => 2); })
 	or pod2usage(2);
 
-pod2usage(1) if(@ARGV < 2);
+pod2usage(1) if (@ARGV < 2);
 
-if($compresslevel < 0 || $compresslevel > 9) {
+if ($compresslevel < 0 || $compresslevel > 9) {
 	$compresslevel = 6;
-	$compresslevel = 9 if $compression eq "bzip2";
+	$compresslevel = 9 if ($compression eq "bzip2");
 }
 
-if($compresslevel eq 0) {
+if ($compresslevel eq 0) {
 	$compresslevel = 1;
 }
 
@@ -68,7 +68,7 @@ my $controldir = File::Spec->catpath("", $indir, "DEBIAN");
 
 die "ERROR: control directory '$controldir' is not a directory or does not exist.\n" unless -d $controldir;
 my $mode = (lstat($controldir))[2];
-die sprintf("ERROR: control directory has bad permissions %03lo (must be >=0755 and <=0775)\n", $mode & 07777) if(($mode & 07757) != 0755);
+die sprintf("ERROR: control directory has bad permissions %03lo (must be >=0755 and <=0775)\n", $mode & 07777) if (($mode & 07757) != 0755);
 
 my $controlfile = File::Spec->catfile($controldir, "control");
 die "ERROR: control file '$controlfile' is not a plain file\n" unless -f $controlfile;
@@ -77,17 +77,17 @@ my %control_data = read_control_file($controlfile);
 die "ERROR: control file '$controlfile' is missing a Package field" unless defined $control_data{"package"};
 die "ERROR: control file '$controlfile' is missing a Version field" unless defined $control_data{"version"};
 die "ERROR: control file '$controlfile' is missing an Architecture field" unless defined $control_data{"architecture"};
-die "ERROR: control file '$controlfile' is missing a final newline (\\n).\n" if($control_data{"eof"} ne "\n");
+die "ERROR: control file '$controlfile' is missing a final newline (\\n).\n" if ($control_data{"eof"} ne "\n");
 
-die "ERROR: package name has characters that aren't lowercase alphanums or '-+.'.\n" if($control_data{"package"} =~ m/[^a-z0-9+-.]/);
-die "ERROR: package version ".$control_data{"version"}." doesn't contain any digits.\n" if($control_data{"version"} !~ m/[0-9]/);
+die "ERROR: package name has characters that aren't lowercase alphanums or '-+.'.\n" if ($control_data{"package"} =~ m/[^a-z0-9+-.]/);
+die "ERROR: package version ".$control_data{"version"}." doesn't contain any digits.\n" if ($control_data{"version"} !~ m/[0-9]/);
 
 foreach my $m ("preinst", "postinst", "prerm", "postrm", "extrainst_") {
 	$_ = File::Spec->catfile($controldir, $m);
 	next unless -e $_;
 	die "ERROR: maintainer script '$m' is not a plain file or symlink\n" unless(-f $_ || -l $_);
 	$mode = (lstat)[2];
-	die sprintf("ERROR: maintainer script '$m' has bad permissions %03lo (must be >=0555 and <=0775)\n", $mode & 07777) if(($mode & 07557) != 0555)
+	die sprintf("ERROR: maintainer script '$m' has bad permissions %03lo (must be >=0555 and <=0775)\n", $mode & 07777) if (($mode & 07557) != 0555);
 }
 
 if (-d "$outfile") {
@@ -170,7 +170,7 @@ sub print_ar_record {
 sub print_ar_file {
 	my ($fh, $data, $size) = @_;
 	syswrite $fh, $data;
-	print $fh "\n" if($size % 2 == 1);
+	print $fh "\n" if ($size % 2 == 1);
 	$fh->flush();
 }
 
@@ -180,7 +180,7 @@ sub tar_filelist {
 	my @filelist;
 
 	find({wanted => sub {
-		return if m#^./DEBIAN#;
+		return if (m#^./DEBIAN#);
 		my $tf = NIC::Archive::Tar::File->new(file=>$_);
 		my @stat = lstat($_);
 		my $mode = $stat[2] & 07777;
@@ -202,8 +202,8 @@ sub read_control_file {
 	open(my $fh, '<', $filename) or die "ERROR: can't open control file '$filename'\n";
 	my %data;
 	while(<$fh>) {
-		die "ERROR: control file contains Windows/Macintosh line endings - please use a text editor or dos2unix to change to Unix line endings\n" if(m/\r/);
-		if(m/^(.*?): (.*)/) {
+		die "ERROR: control file contains Windows/Macintosh line endings - please use a text editor or dos2unix to change to Unix line endings\n" if (m/\r/);
+		if (m/^(.*?): (.*)/) {
 			$data{lc($1)} = $2;
 		}
 		if (eof) {
@@ -215,11 +215,11 @@ sub read_control_file {
 }
 
 sub compression_cmd {
-	return "gzip -c".$compresslevel if $::compression eq "gzip";
-	return "bzip2 -c".$compresslevel if $::compression eq "bzip2";
-	return "lzma -c".$compresslevel if $::compression eq "lzma";
-	return "xz -c".$compresslevel if $::compression eq "xz";
-	if($::compression ne "cat") {
+	return "gzip -c".$compresslevel if ($::compression eq "gzip");
+	return "bzip2 -c".$compresslevel if ($::compression eq "bzip2");
+	return "lzma -c".$compresslevel if ($::compression eq "lzma");
+	return "xz -c".$compresslevel if ($::compression eq "xz");
+	if ($::compression ne "cat") {
 		print "WARNING: compressor '$::compression' is unknown, falling back to cat.\n";
 	}
 	return "cat";
@@ -228,10 +228,10 @@ sub compression_cmd {
 sub compressed_filename {
 	my $fn = shift;
 	my $suffix = "";
-	$suffix = ".gz" if $::compression eq "gzip";
-	$suffix = ".bz2" if $::compression eq "bzip2";
-	$suffix = ".lzma" if $::compression eq "lzma";
-	$suffix = ".xz" if $::compression eq "xz";
+	$suffix = ".gz" if ($::compression eq "gzip");
+	$suffix = ".bz2" if ($::compression eq "bzip2");
+	$suffix = ".lzma" if ($::compression eq "lzma");
+	$suffix = ".xz" if ($::compression eq "xz");
 	return $fn.$suffix;
 }
 
