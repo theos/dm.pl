@@ -77,7 +77,6 @@ my %control_data = read_control_file($controlfile);
 die "ERROR: control file '$controlfile' is missing a Package field" unless defined $control_data{"package"};
 die "ERROR: control file '$controlfile' is missing a Version field" unless defined $control_data{"version"};
 die "ERROR: control file '$controlfile' is missing an Architecture field" unless defined $control_data{"architecture"};
-die "ERROR: control file '$controlfile' is missing a final newline (\\n).\n" if ($control_data{"eof"} ne "\n");
 
 die "ERROR: package name has characters that aren't lowercase alphanums or '-+.'.\n" if ($control_data{"package"} =~ m/[^a-z0-9+-.]/);
 die "ERROR: package version ".$control_data{"version"}." doesn't contain any digits.\n" if ($control_data{"version"} !~ m/[0-9]/);
@@ -205,9 +204,10 @@ sub read_control_file {
 		die "ERROR: control file contains Windows/Macintosh line endings - please use a text editor or dos2unix to change to Unix line endings\n" if (m/\r/);
 		if (m/^(.*?): (.*)/) {
 			$data{lc($1)} = $2;
+			die "ERROR: control file contains an unclosed parenthesis\n" if ($_ =~ /\(/ && $_ !~ /\)/);
 		}
 		if (eof) {
-			$data{"eof"} = substr($_, -1);
+			die "ERROR: control file is missing a final newline (\\n)\n" if (substr($_, -1) ne "\n");
 		}
 	}
 	close $fh;
