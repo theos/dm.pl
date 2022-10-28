@@ -150,10 +150,10 @@ dm.pl [options] <directory> <package>
 This option exists solely for compatibility with dpkg-deb.
 .IP "\fB\-Z<compression>\fR" 8
 .IX Item "-Z<compression>"
-Specify the package compression type. Valid values are gzip (default), bzip2, lzma, xz and cat (no compression.)
+Specify the package compression type. Valid values are gzip (default), bzip2, lzma, xz and cat (no compression).
 .IP "\fB\-z<compress\-level>\fR" 8
 .IX Item "-z<compress-level>"
-Specify the package compression level. Valid values are between 1 and 9. Default is 9 for bzip2, 6 for others. 0 is identical to 1. Refer to \fB\fBgzip\fB\|(1)\fR, \fB\fBbzip2\fB\|(1)\fR, \fB\fBxz\fB\|(1)\fR for explanations of what effect each compression level has.
+Specify the package compression level. Valid values are between 0 and 9. Default is 9 for bzip2, 6 for others, and 0 is equivalent to cat. Refer to \fB\fBgzip\fB\|(1)\fR, \fB\fBbzip2\fB\|(1)\fR, \fB\fBxz\fB\|(1)\fR for explanations of what effect each compression level has.
 .IP "\fB\-\-help\fR, \fB\-?\fR" 8
 .IX Item "--help, -?"
 Print a brief help message and exit.
