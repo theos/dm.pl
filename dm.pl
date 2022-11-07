@@ -36,7 +36,7 @@ our $VERSION = '2.0';
 
 our $_PROGNAME = "dm.pl";
 
-my $ADMINARCHIVENAME = "control.tar.gz";
+my $ADMINARCHIVENAME = "control.tar";
 my $DATAARCHIVENAME  = "data.tar";
 my $ARCHIVEVERSION   = "2.0";
 
@@ -117,14 +117,57 @@ print_ar_record($ar, "debian-binary", time, 0, 0, 0100644, 4);
 print_ar_file($ar, "$ARCHIVEVERSION\n", 4);
 
 {
-	my $tar = Archive::Tar->new();
-	$tar->add_files(tar_filelist($controldir));
-	my $comp;
-	my $zFd = IO::Compress::Gzip->new(\$comp, -Level => 9);
-	$tar->write($zFd);
-	$zFd->close();
-	print_ar_record($ar, $ADMINARCHIVENAME, time, 0, 0, 0100644, length($comp));
-	print_ar_file($ar, $comp, length($comp));
+    my $tar = Archive::Tar->new();
+    $tar->add_files(tar_filelist($controldir));
+    my ($fh_out, $fh_in);
+    my $pid = open2($fh_out, $fh_in, compression_cmd())
+    or die "ERROR: open2 failed to create pipes for '$::compression'\n";
+    fcntl($fh_out, F_SETFL, O_NONBLOCK);
+    fcntl($fh_in,  F_SETFL, O_NONBLOCK);
+    my $tmp_data = $tar->write();
+    my $tmp_size = length($tmp_data);
+    
+    my ($off_in,      $off_out) = (0, 0);
+    my ($archivedata, $archivesize);
+    while ($off_in < $tmp_size) {
+        my ($rin,  $win) = ('', '');
+        my ($rout, $wout);
+        vec($win, fileno($fh_in),  1) = 1;
+        vec($rin, fileno($fh_out), 1) = 1;
+        
+        # Wait for space to be available to write or data to be available to read
+        select($rout = $rin, $wout = $win, undef, undef);
+        if (vec($wout, fileno($fh_in), 1)) {
+            
+            # Write 8KB of data
+            my $wrote = syswrite $fh_in, $tmp_data, 8192, $off_in;
+            $off_in += $wrote if (defined $wrote);
+        }
+        if (vec($rin, fileno($fh_out), 1)) {
+            
+            # Get the compressed result if possible
+            my $o = sysread $fh_out, $archivedata, 8192, $off_out;
+            $off_out += $o if (defined($o));
+        }
+    }
+    $fh_in->close();
+    
+    while (1) {
+        
+        # Get the remaining data
+        my $o = sysread $fh_out, $archivedata, 8192, $off_out;
+        if (defined($o) && $o > 0) {
+            $off_out += $o;
+        }
+        elsif ($! != EAGAIN) {
+            last;
+        }
+    }
+    $archivesize = $off_out;
+    $fh_out->close();
+    waitpid($pid, 0);
+    print_ar_record($ar, compressed_filename($ADMINARCHIVENAME), time, 0, 0, 0100644, $archivesize);
+    print_ar_file($ar, $archivedata, $archivesize);
 }
 {
 	my $tar = Archive::Tar->new();
