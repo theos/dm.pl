@@ -42,13 +42,15 @@ my $ARCHIVEVERSION   = "2.0";
 
 our $compression   = "gzip";
 our $compresslevel = -1;
+our $admin_uniform = 0;
 Getopt::Long::Configure("bundling", "auto_version");
 GetOptions(
-	'compression|Z=s'    => \$compression,
-	'compress-level|z=i' => \$compresslevel,
-	'build|b'            => sub { },
-	'help|?'             => sub { pod2usage(1); },
-	'man'                => sub { pod2usage(-exitstatus => 0, -verbose => 2); }
+	'compression|Z=s'     => \$compression,
+	'compress-level|z=i'  => \$compresslevel,
+	'uniform-compression' => sub { $admin_uniform = 1; },
+	'build|b'             => sub { },
+	'help|?'              => sub { pod2usage(1); },
+	'man'                 => sub { pod2usage(-exitstatus => 0, -verbose => 2); }
 ) or pod2usage(2);
 
 pod2usage(1) if (@ARGV < 2);
@@ -117,63 +119,26 @@ print_ar_record($ar, "debian-binary", time, 0, 0, 0100644, 4);
 print_ar_file($ar, "$ARCHIVEVERSION\n", 4);
 
 {
-    my $tar = Archive::Tar->new();
-    $tar->add_files(tar_filelist($controldir));
-    my ($fh_out, $fh_in);
-    my $pid = open2($fh_out, $fh_in, compression_cmd())
-    or die "ERROR: open2 failed to create pipes for '$::compression'\n";
-    fcntl($fh_out, F_SETFL, O_NONBLOCK);
-    fcntl($fh_in,  F_SETFL, O_NONBLOCK);
-    my $tmp_data = $tar->write();
-    my $tmp_size = length($tmp_data);
-    
-    my ($off_in,      $off_out) = (0, 0);
-    my ($archivedata, $archivesize);
-    while ($off_in < $tmp_size) {
-        my ($rin,  $win) = ('', '');
-        my ($rout, $wout);
-        vec($win, fileno($fh_in),  1) = 1;
-        vec($rin, fileno($fh_out), 1) = 1;
-        
-        # Wait for space to be available to write or data to be available to read
-        select($rout = $rin, $wout = $win, undef, undef);
-        if (vec($wout, fileno($fh_in), 1)) {
-            
-            # Write 8KB of data
-            my $wrote = syswrite $fh_in, $tmp_data, 8192, $off_in;
-            $off_in += $wrote if (defined $wrote);
-        }
-        if (vec($rin, fileno($fh_out), 1)) {
-            
-            # Get the compressed result if possible
-            my $o = sysread $fh_out, $archivedata, 8192, $off_out;
-            $off_out += $o if (defined($o));
-        }
-    }
-    $fh_in->close();
-    
-    while (1) {
-        
-        # Get the remaining data
-        my $o = sysread $fh_out, $archivedata, 8192, $off_out;
-        if (defined($o) && $o > 0) {
-            $off_out += $o;
-        }
-        elsif ($! != EAGAIN) {
-            last;
-        }
-    }
-    $archivesize = $off_out;
-    $fh_out->close();
-    waitpid($pid, 0);
-    print_ar_record($ar, compressed_filename($ADMINARCHIVENAME), time, 0, 0, 0100644, $archivesize);
-    print_ar_file($ar, $archivedata, $archivesize);
+	my $tar = Archive::Tar->new();
+	$tar->add_files(tar_filelist($controldir));
+	my ($archivedata, $archivesize) = compress_tar($tar, compression_cmd($ADMINARCHIVENAME));
+	print_ar_record($ar, compressed_filename($ADMINARCHIVENAME), time, 0, 0, 0100644, $archivesize);
+	print_ar_file($ar, $archivedata, $archivesize);
 }
 {
 	my $tar = Archive::Tar->new();
 	$tar->add_files(tar_filelist($indir));
+	my ($archivedata, $archivesize) = compress_tar($tar, compression_cmd($DATAARCHIVENAME));
+	print_ar_record($ar, compressed_filename($DATAARCHIVENAME), time, 0, 0, 0100644, $archivesize);
+	print_ar_file($ar, $archivedata, $archivesize);
+}
+
+close $ar;
+
+sub compress_tar {
+	my ($tar, $cmd) = @_;
 	my ($fh_out, $fh_in);
-	my $pid = open2($fh_out, $fh_in, compression_cmd())
+	my $pid = open2($fh_out, $fh_in, $cmd)
 	  or die "ERROR: open2 failed to create pipes for '$::compression'\n";
 	fcntl($fh_out, F_SETFL, O_NONBLOCK);
 	fcntl($fh_in,  F_SETFL, O_NONBLOCK);
@@ -191,13 +156,11 @@ print_ar_file($ar, "$ARCHIVEVERSION\n", 4);
 		# Wait for space to be available to write or data to be available to read
 		select($rout = $rin, $wout = $win, undef, undef);
 		if (vec($wout, fileno($fh_in), 1)) {
-
 			# Write 8KB of data
 			my $wrote = syswrite $fh_in, $tmp_data, 8192, $off_in;
 			$off_in += $wrote if (defined $wrote);
 		}
 		if (vec($rin, fileno($fh_out), 1)) {
-
 			# Get the compressed result if possible
 			my $o = sysread $fh_out, $archivedata, 8192, $off_out;
 			$off_out += $o if (defined($o));
@@ -206,7 +169,6 @@ print_ar_file($ar, "$ARCHIVEVERSION\n", 4);
 	$fh_in->close();
 
 	while (1) {
-
 		# Get the remaining data
 		my $o = sysread $fh_out, $archivedata, 8192, $off_out;
 		if (defined($o) && $o > 0) {
@@ -219,11 +181,8 @@ print_ar_file($ar, "$ARCHIVEVERSION\n", 4);
 	$archivesize = $off_out;
 	$fh_out->close();
 	waitpid($pid, 0);
-	print_ar_record($ar, compressed_filename($DATAARCHIVENAME), time, 0, 0, 0100644, $archivesize);
-	print_ar_file($ar, $archivedata, $archivesize);
+	return ($archivedata, $archivesize);
 }
-
-close $ar;
 
 sub print_ar_record {
 	my ($fh, $filename, $timestamp, $uid, $gid, $mode, $size) = @_;
@@ -291,7 +250,8 @@ sub read_control_file {
 }
 
 sub compression_cmd {
-	return "gzip -c" . $compresslevel  if ($::compression eq "gzip");
+	my $fn = shift;
+	return "gzip -c" . $compresslevel  if ($::compression eq "gzip") or ($fn eq $ADMINARCHIVENAME and not $admin_uniform);
 	return "bzip2 -c" . $compresslevel if ($::compression eq "bzip2");
 	return "lzma -c" . $compresslevel  if ($::compression eq "lzma");
 	return "xz -c" . $compresslevel    if ($::compression eq "xz");
@@ -302,13 +262,12 @@ sub compression_cmd {
 }
 
 sub compressed_filename {
-	my $fn     = shift;
-	my $suffix = "";
-	$suffix = ".gz"   if ($::compression eq "gzip");
-	$suffix = ".bz2"  if ($::compression eq "bzip2");
-	$suffix = ".lzma" if ($::compression eq "lzma");
-	$suffix = ".xz"   if ($::compression eq "xz");
-	return $fn . $suffix;
+	my $fn = shift;
+	return $fn . ".gz"   if ($::compression eq "gzip") or ($fn eq $ADMINARCHIVENAME and not $admin_uniform);
+	return $fn . ".bz2"  if ($::compression eq "bzip2");
+	return $fn . ".lzma" if ($::compression eq "lzma");
+	return $fn . ".xz"   if ($::compression eq "xz");
+	return $fn;
 }
 
 __END__
@@ -336,6 +295,10 @@ Specify the package compression type. Valid values are gzip (default), bzip2, lz
 =item B<-zE<lt>compress-levelE<gt>>
 
 Specify the package compression level. Valid values are between 0 and 9. Default is 9 for bzip2, 6 for others, and 0 is equivalent to cat. Refer to B<gzip(1)>, B<bzip2(1)>, B<xz(1)> for explanations of what effect each compression level has.
+
+=item B<--uniform-compression>
+
+Specify that the package compression type should be used for the control archive as well as the data archive. If not specified, the control archive will be compressed as gzip for widest compatibility. Supported as of dpkg 1.17.6.
 
 =item B<--help>, B<-?>
 
